@@ -272,3 +272,20 @@ pub struct UserProfile {
 	/// ユーザー ID。すべての Google アカウントの中で一意であり、再利用されることはありません。
 	sub: String,
 }
+
+pub trait MapHelper {
+	fn get_string(&self, key: &str) -> String;
+}
+
+impl MapHelper for std::collections::HashMap<String, String> {
+	fn get_string(&self, key: &str) -> String {
+		if !self.contains_key(key) {
+			return "".to_string();
+		}
+		let value = self.get(key);
+		if value.is_none() {
+			return "".to_string();
+		}
+		return value.unwrap().clone();
+	}
+}
