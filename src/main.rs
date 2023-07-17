@@ -58,11 +58,17 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 	// コードチャレンジ(推奨)
 	let code_challenge = util::generate_code_challenge(&code_verifier);
 
-	// Google OAuth による認可手続き要求します。
+    // ========== ブラウザーで認可画面を開く ==========
+
+	// Google OAuth による認可手続きの開始を要求します。
 	begin_google_oauth(&client_secret.installed.client_id, &state, &code_challenge, &redirect_uri)?;
+
+    // ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
 
 	// 応答を受け取るための HTTP サーバーを立ち上げます。
 	let (code, state) = recv_response(port, &redirect_uri)?;
+
+    // ========== トークンに変換 >> Google API ==========
 
 	// アクセストークンをリクエスト
 	let token_info = exchange_code_to_tokens(
@@ -74,7 +80,9 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 		&redirect_uri,
 	)?;
 
-	// user profile を問い合わせ
+    // ========== ユーザーの情報を要求 >> Google API ==========
+
+    // user profile を問い合わせ
 	let user_profile = query_user_info(&token_info.access_token)?;
 
 	info!("ユーザープロファイル> {:?}", user_profile);
