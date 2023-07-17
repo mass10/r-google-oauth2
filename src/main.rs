@@ -78,14 +78,15 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 		&code_verifier,
 		&redirect_uri,
 	)?;
+	info!("GOOGLE> token_info: {:?}", &token_info);
 
 	// ========== アクセストークンの確認 >> Google API ==========
 	let result = request_verify_access_token(&token_info.access_token)?;
-	info!("GOOGLE> token_info: {:?}", &result);
+	info!("GOOGLE> verify: {:?}", &result);
 
 	// ========== ユーザーの情報を要求 >> Google API ==========
 	let user_profile = query_user_info(&token_info.access_token)?;
-	info!("GOOGLE> ユーザープロファイル: {:?}", user_profile);
+	info!("GOOGLE> user_profile: {:?}", user_profile);
 
 	return Ok(());
 }
@@ -251,8 +252,6 @@ fn exchange_code_to_tokens(
 	let response = client.post(url).form(&params).send()?;
 	let text = response.text()?;
 	let token_info: TokenData = serde_json::from_str(&text)?;
-
-	info!("GOOGLE> {:?}", &token_info);
 
 	return Ok(token_info);
 }
