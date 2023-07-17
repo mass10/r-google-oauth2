@@ -121,18 +121,18 @@ fn recv_response(port: u16, _redirect_uri: &str) -> Result<(String, String), Box
 	info!("ローカルサーバーを起動しています...");
 
 	// Google から ローカルにリダイレクトされるまで待機します。
+	// TODO: タイムアウトする仕組み
 	let address = format!("127.0.0.1:{}", port);
 	let listener = std::net::TcpListener::bind(&address)?;
 
-	// リクエスト全体を受け取る
 	info!("リクエストを待機しています...");
 	let (stream, _) = listener.accept()?;
 	let query = accept_peer(stream)?;
 
 	// 初めに error を取得する
-	if query.contains_key("error") {
-		let error = query.get("error").unwrap();
-		return Err(error.to_string().into());
+	let error = query.get_string("error");
+	if error != "" {
+		return Err(error.into());
 	}
 
 	// code を取得する
