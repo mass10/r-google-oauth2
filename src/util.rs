@@ -241,7 +241,7 @@ pub struct TokenVerificationResult {
 	/// メールアドレス
 	email: String,
 	/// ユーザーのメールアドレスが確認済みであれば true、そうでない場合は false。
-	email_verified: bool,
+	email_verified: String,
 	///
 	exp: String,
 	/// アクセス トークンの残りの有効期間（秒）
