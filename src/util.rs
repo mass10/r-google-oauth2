@@ -177,7 +177,7 @@ pub fn generate_random_string(size: u32) -> String {
 }
 
 #[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct TokenInfo {
+pub struct TokenData {
 	/// アクセストークン
 	pub access_token: String,
 	/// アクセス トークンの残りの有効期間（秒）
@@ -227,6 +227,29 @@ pub fn generate_random_u8_array(length: u32) -> Vec<u8> {
 		result.push(value);
 	}
 	return result;
+}
+
+/// アクセストークン情報
+#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
+pub struct TokenVerificationResult {
+	///
+	access_type: String,
+	///
+	aud: String,
+	///
+	azp: String,
+	/// メールアドレス
+	email: String,
+	/// ユーザーのメールアドレスが確認済みであれば true、そうでない場合は false。
+	email_verified: bool,
+	///
+	exp: String,
+	/// アクセス トークンの残りの有効期間（秒）
+	expires_in: String,
+	/// access_token によって付与されるアクセス スコープ
+	scope: String,
+	/// ユーザー ID。すべての Google アカウントの中で一意であり、再利用されることはありません。
+	sub: String,
 }
 
 /// ユーザープロファイル
