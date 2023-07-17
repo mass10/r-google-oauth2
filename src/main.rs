@@ -116,6 +116,8 @@ fn accept_peer(mut stream: std::net::TcpStream) -> Result<std::collections::Hash
 /// # Returns
 /// code, url を受け取ります。
 fn recv_response(port: u16, _redirect_uri: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+	use util::MapHelper;
+
 	info!("ローカルサーバーを起動しています...");
 
 	// Google から ローカルにリダイレクトされるまで待機します。
@@ -134,18 +136,9 @@ fn recv_response(port: u16, _redirect_uri: &str) -> Result<(String, String), Box
 	}
 
 	// code を取得する
-	let code = if query.contains_key("code") {
-		query.get("code").unwrap().to_string()
-	} else {
-		String::new()
-	};
-
+	let code = query.get_string("code");
 	// state を取得する
-	let state = if query.contains_key("state") {
-		query.get("state").unwrap().to_string()
-	} else {
-		String::new()
-	};
+	let state = query.get_string("state");
 
 	// 1回で終了する
 
