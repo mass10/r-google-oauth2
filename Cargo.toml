@@ -1,0 +1,18 @@
+[package]
+name = "r-google-oauth2"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+getopts = "*"
+chrono = "*"
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
+reqwest = { version = "*", features = ["blocking", "json"] }
+sha2 = "*"
+rand = "*"
+base64 =  { version = "*", features = ["std"] }
+open = "*"
