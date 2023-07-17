@@ -8,7 +8,9 @@ mod util;
 
 use std::io::{BufRead, Write};
 
-use util::{TokenInfo, UserProfile};
+use util::{ClientSecret, TokenData, UserProfile};
+
+use crate::util::TokenVerificationResult;
 
 /// Rust アプリケーションのエントリーポイント
 fn main() {
@@ -59,17 +61,14 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 	let code_challenge = util::generate_code_challenge(&code_verifier);
 
 	// ========== ブラウザーで認可画面を開く ==========
-
 	// Google OAuth による認可手続きの開始を要求します。
 	begin_google_oauth(&client_secret.installed.client_id, &state, &code_challenge, &redirect_uri)?;
 
 	// ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
-
 	// 応答を受け取るための HTTP サーバーを立ち上げます。
 	let (code, state) = recv_response(port, &redirect_uri)?;
 
 	// ========== トークンに変換 >> Google API ==========
-
 	// アクセストークンをリクエスト
 	let token_info = exchange_code_to_tokens(
 		&client_secret.installed.client_id,
@@ -80,12 +79,13 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 		&redirect_uri,
 	)?;
 
+	// ========== アクセストークンの確認 >> Google API ==========
+	let result = request_verify_access_token(&token_info.access_token)?;
+	info!("GOOGLE> token_info: {:?}", &result);
+
 	// ========== ユーザーの情報を要求 >> Google API ==========
-
-	// user profile を問い合わせ
 	let user_profile = query_user_info(&token_info.access_token)?;
-
-	info!("ユーザープロファイル> {:?}", user_profile);
+	info!("GOOGLE> ユーザープロファイル: {:?}", user_profile);
 
 	return Ok(());
 }
@@ -169,6 +169,10 @@ fn begin_google_oauth(client_id: &str, state: &str, code_challenge: &str, redire
 	return Ok(());
 }
 
+/// client_secret*.json を列挙します。
+///
+/// # Arguments
+/// * `location` - 検索を開始する場所
 fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 	let mut result: Vec<String> = vec![];
 	let unknown = std::path::Path::new(location);
@@ -192,7 +196,8 @@ fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::e
 	return Ok(result);
 }
 
-fn configure() -> Result<util::ClientSecret, Box<dyn std::error::Error>> {
+/// コンフィギュレーションを行います。
+fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
 	let location = ".\\";
 
 	let files = enumerate_client_secret(location)?;
@@ -217,10 +222,13 @@ fn configure() -> Result<util::ClientSecret, Box<dyn std::error::Error>> {
 }
 
 /// client_secret*.json をパースします。
-fn parse_client_secret(path: &str) -> Result<util::ClientSecret, Box<dyn std::error::Error>> {
+///
+/// # Arguments
+/// * `path` - ファイルパス
+fn parse_client_secret(path: &str) -> Result<ClientSecret, Box<dyn std::error::Error>> {
 	let file = std::fs::File::open(path)?;
 	let reader = std::io::BufReader::new(file);
-	let client_secret: util::ClientSecret = serde_json::from_reader(reader)?;
+	let client_secret: ClientSecret = serde_json::from_reader(reader)?;
 	return Ok(client_secret);
 }
 
@@ -232,9 +240,10 @@ fn exchange_code_to_tokens(
 	code: &str,
 	code_verifier: &str,
 	redirect_uri: &str,
-) -> Result<TokenInfo, Box<dyn std::error::Error>> {
+) -> Result<TokenData, Box<dyn std::error::Error>> {
 	let url = "https://www.googleapis.com/oauth2/v4/token";
 	// let url = "https://oauth2.googleapis.com/token"; // こっちでもOK
+
 	let mut params = std::collections::HashMap::new();
 	params.insert("code", code);
 	params.insert("client_id", client_id);
@@ -244,22 +253,47 @@ fn exchange_code_to_tokens(
 	params.insert("redirect_uri", redirect_uri);
 	params.insert("grant_type", "authorization_code");
 	params.insert("code_verifier", &code_verifier);
+
 	let client = reqwest::blocking::Client::new();
 	let response = client.post(url).form(&params).send()?;
 	let text = response.text()?;
-	let token_info: TokenInfo = serde_json::from_str(&text)?;
+	let token_info: TokenData = serde_json::from_str(&text)?;
+
 	info!("GOOGLE> {:?}", &token_info);
+
+	return Ok(token_info);
+}
+
+fn http_get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+	let client = reqwest::blocking::Client::new();
+	let response = client.get(url).send()?;
+	let text = response.text()?;
+	return Ok(text);
+}
+
+/// トークンの有効性を確認します。
+fn request_verify_access_token(access_token: &str) -> Result<TokenVerificationResult, Box<dyn std::error::Error>> {
+	info!("Verify access token...");
+
+	let uri = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", access_token);
+	let text = http_get(&uri)?;
+	let token_info: TokenVerificationResult = serde_json::from_str(&text)?;
+
 	return Ok(token_info);
 }
 
 /// ユーザープロファイルを問い合わせます。
 fn query_user_info(access_token: &str) -> Result<UserProfile, Box<dyn std::error::Error>> {
 	let url = "https://www.googleapis.com/oauth2/v3/userinfo";
+
 	let mut headers = reqwest::header::HeaderMap::new();
 	headers.insert("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", access_token)).unwrap());
+
 	let client = reqwest::blocking::Client::new();
 	let response = client.get(url).headers(headers).send().unwrap();
 	let text = response.text().unwrap();
+
 	let user_profile: UserProfile = serde_json::from_str(&text).unwrap();
+
 	return Ok(user_profile);
 }
