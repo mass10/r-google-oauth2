@@ -289,3 +289,21 @@ impl MapHelper for std::collections::HashMap<String, String> {
 		return value.unwrap().clone();
 	}
 }
+
+/// 簡易的なストップウォッチ
+pub struct SimpleStopWatch {
+	start: std::time::Instant,
+}
+
+impl SimpleStopWatch {
+	pub fn new() -> Self {
+		let start = std::time::Instant::now();
+		return Self { start };
+	}
+
+	pub fn elapsed(&self) -> std::time::Duration {
+		let now = std::time::Instant::now();
+		let elapsed = now.duration_since(self.start);
+		return elapsed;
+	}
+}
