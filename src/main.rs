@@ -10,7 +10,7 @@ use std::io::{BufRead, Write};
 
 use util::{ClientSecret, TokenData, UserProfile};
 
-use crate::util::TokenVerificationResult;
+use crate::util::{SimpleStopWatch, TokenVerificationResult};
 
 /// Rust アプリケーションのエントリーポイント
 fn main() {
@@ -66,7 +66,7 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 
 	// ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
 	// 応答を受け取るための HTTP サーバーを立ち上げます。
-	let (code, state) = recv_response(port, &redirect_uri)?;
+	let (code, state) = recv_response(port)?;
 
 	// ========== トークンに変換 >> Google API ==========
 	// アクセストークンをリクエスト
@@ -91,6 +91,7 @@ fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
 	return Ok(());
 }
 
+/// 接続を開始します。
 fn accept_peer(mut stream: std::net::TcpStream) -> Result<std::collections::HashMap<String, String>, Box<dyn std::error::Error>> {
 	info!("着信あり");
 
@@ -112,23 +113,46 @@ fn accept_peer(mut stream: std::net::TcpStream) -> Result<std::collections::Hash
 ///
 /// # Arguments
 /// * `port` - ポート番号
-/// * `redirect_uri` - リダイレクトURI
 ///
 /// # Returns
 /// code, url を受け取ります。
-fn recv_response(port: u16, _redirect_uri: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+fn recv_response(port: u16) -> Result<(String, String), Box<dyn std::error::Error>> {
 	use util::MapHelper;
-
-	info!("ローカルサーバーを起動しています...");
 
 	// Google から ローカルにリダイレクトされるまで待機します。
 	// TODO: タイムアウトする仕組み
+	info!("ローカルサーバーを起動しています...");
 	let address = format!("127.0.0.1:{}", port);
 	let listener = std::net::TcpListener::bind(&address)?;
 
+	// non-blocking にすることで、accept がブロックしないようにする
+	listener.set_nonblocking(true)?;
+
+	// 簡易的なストップウォッチ
+	let stop_watch = SimpleStopWatch::new();
+
 	info!("リクエストを待機しています...");
-	let (stream, _) = listener.accept()?;
-	let query = accept_peer(stream)?;
+	let mut query = std::collections::HashMap::new();
+	for status in listener.incoming() {
+		// 120秒で待ち受けを解除
+		if 120 <= stop_watch.elapsed().as_secs() {
+			return Err("認可手続きの待機時間が120秒を超えたため、手続きはタイムアウトしました。".into());
+		}
+
+		if status.is_err() {
+			let err = status.err().unwrap();
+			if err.kind() == std::io::ErrorKind::WouldBlock {
+				std::thread::sleep(std::time::Duration::from_millis(100));
+				continue;
+			}
+			error!("復旧不能なエラーです。理由: {:?}", err);
+			break;
+		}
+
+		query = accept_peer(status.unwrap())?;
+
+		break;
+	}
 
 	// 初めに error を取得する
 	let error = query.get_string("error");
@@ -248,12 +272,18 @@ fn exchange_code_to_tokens(
 	params.insert("grant_type", "authorization_code");
 	params.insert("code_verifier", &code_verifier);
 
-	let client = reqwest::blocking::Client::new();
-	let response = client.post(url).form(&params).send()?;
-	let text = response.text()?;
+	let text = http_post(url, &params)?;
+
 	let token_info: TokenData = serde_json::from_str(&text)?;
 
 	return Ok(token_info);
+}
+
+fn http_post(url: &str, params: &std::collections::HashMap<&str, &str>) -> Result<String, Box<dyn std::error::Error>> {
+	let client = reqwest::blocking::Client::new();
+	let response = client.post(url).form(params).send()?;
+	let text = response.text()?;
+	return Ok(text);
 }
 
 fn http_get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
