@@ -1,1 +1,2 @@
-cargo fmt && cargo build
+cargo fmt
+cargo build
