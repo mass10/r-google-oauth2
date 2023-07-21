@@ -4,6 +4,7 @@
 //! # References
 //! - [モバイル &デスクトップ アプリ向け OAuth 2.0](https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja)
 
+mod configuration;
 mod util;
 
 /// Rust アプリケーションのエントリーポイント
@@ -26,8 +27,17 @@ fn main() {
 		std::process::exit(0);
 	}
 
+	// client_secret*.json を検出
+	let result = configuration::configure();
+	if result.is_err() {
+		let err = result.err().unwrap();
+		error!("{}", err);
+		std::process::exit(1);
+	}
+	let client_secret = result.unwrap();
+
 	// Google OAuth 2.0 のテスト
-	let result = google_auth::execute_oauth_example();
+	let result = google_auth::execute_oauth_example(&client_secret.installed.client_id, &client_secret.installed.client_secret);
 	if result.is_err() {
 		let err = result.err().unwrap();
 		error!("{}", err);
@@ -42,10 +52,7 @@ mod google_auth {
 	use std::io::{BufRead, Write};
 
 	/// Google OAuth 2.0 のテスト
-	pub fn execute_oauth_example() -> Result<(), Box<dyn std::error::Error>> {
-		// client_secret*.json を検出
-		let client_secret = configure()?;
-
+	pub fn execute_oauth_example(client_id: &str, client_secret: &str) -> Result<(), Box<dyn std::error::Error>> {
 		// ランダムなポートを選択します。
 		let port = util::select_random_tcp_port()?;
 
@@ -60,7 +67,7 @@ mod google_auth {
 
 		// ========== ブラウザーで認可画面を開く ==========
 		// Google OAuth による認可手続きの開始を要求します。
-		begin_google_oauth(&client_secret.installed.client_id, &state, &code_challenge, &redirect_uri)?;
+		begin_google_oauth(client_id, &state, &code_challenge, &redirect_uri)?;
 
 		// ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
 		// 応答を受け取るための HTTP サーバーを立ち上げます。
@@ -68,14 +75,7 @@ mod google_auth {
 
 		// ========== トークンに変換 >> Google API ==========
 		// アクセストークンをリクエスト
-		let token_info = exchange_code_to_tokens(
-			&client_secret.installed.client_id,
-			&client_secret.installed.client_secret,
-			&state,
-			&code,
-			&code_verifier,
-			&redirect_uri,
-		)?;
+		let token_info = exchange_code_to_tokens(client_id, client_secret, &state, &code, &code_verifier, &redirect_uri)?;
 		info!("GOOGLE> token_info: {:?}", &token_info);
 
 		// ========== アクセストークンの確認 >> Google API ==========
@@ -183,83 +183,6 @@ mod google_auth {
 		util::open_browser(&url)?;
 
 		return Ok(());
-	}
-
-	/// client_secret*.json を列挙します。
-	///
-	/// # Arguments
-	/// * `location` - 検索を開始する場所
-	fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-		let mut result: Vec<String> = vec![];
-		let unknown = std::path::Path::new(location);
-		if unknown.is_file() {
-			let file_name = unknown.file_name().unwrap().to_str().unwrap();
-			if file_name.starts_with("client_secret") && file_name.ends_with(".json") {
-				let path = unknown.to_str().unwrap();
-				let path = path.to_string();
-				result.push(path);
-				return Ok(result);
-			}
-		} else if unknown.is_dir() {
-			for entry in std::fs::read_dir(unknown)? {
-				let entry = entry?;
-				let path = entry.path();
-				let mut tmp = enumerate_client_secret(path.to_str().unwrap())?;
-				result.append(&mut tmp);
-			}
-			return Ok(result);
-		}
-		return Ok(result);
-	}
-
-	#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-	struct Installed {
-		pub client_id: String,
-		pub client_secret: String,
-		pub redirect_uris: Vec<String>,
-		pub auth_uri: String,
-		pub token_uri: String,
-	}
-
-	#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-	struct ClientSecret {
-		pub installed: Installed,
-	}
-
-	/// コンフィギュレーションを行います。
-	fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
-		let location = ".\\";
-
-		let files = enumerate_client_secret(location)?;
-		if files.len() == 0 {
-			info!("ファイルなし");
-			return Err("No client secret found".into());
-		}
-
-		for file in files {
-			let result = parse_client_secret(&file);
-			if result.is_err() {
-				info!("パースエラー {:?}", file);
-				continue;
-			}
-			let client_secret = result.unwrap();
-			if client_secret.installed.client_id.len() > 0 && client_secret.installed.client_secret.len() > 0 {
-				return Ok(client_secret);
-			}
-		}
-
-		return Err("No client secret found".into());
-	}
-
-	/// client_secret*.json をパースします。
-	///
-	/// # Arguments
-	/// * `path` - ファイルパス
-	fn parse_client_secret(path: &str) -> Result<ClientSecret, Box<dyn std::error::Error>> {
-		let file = std::fs::File::open(path)?;
-		let reader = std::io::BufReader::new(file);
-		let client_secret: ClientSecret = serde_json::from_reader(reader)?;
-		return Ok(client_secret);
 	}
 
 	#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
