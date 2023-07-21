@@ -10,7 +10,7 @@ mod util;
 
 /// Rust アプリケーションのエントリーポイント
 fn main() {
-	// コマンドラインオプションを解析する
+	// コマンドラインオプション
 	let args: Vec<String> = std::env::args().skip(1).collect();
 	let mut options = getopts::Options::new();
 	options.opt("h", "help", "Usage", "FLAG", getopts::HasArg::No, getopts::Occur::Optional);
@@ -18,13 +18,13 @@ fn main() {
 	if result.is_err() {
 		let err = result.err().unwrap();
 		println!("{}", err);
-		println!("{}", options.usage(""));
+		println!("{}", options.usage("r-google-oauth2-sample: Rust + Google OAuth 2.0 のサンプル"));
 		std::process::exit(1);
 	}
 	let matches = result.unwrap();
 
-	if matches.opt_present("h") {
-		println!("{}", options.usage(""));
+	if matches.opt_present("help") {
+		println!("{}", options.usage("r-google-oauth2-sample: Rust + Google OAuth 2.0 のサンプル"));
 		std::process::exit(0);
 	}
 
