@@ -5,7 +5,7 @@
 //! - [モバイル &デスクトップ アプリ向け OAuth 2.0](https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja)
 
 mod configuration;
-mod service;
+mod google_oauth_example;
 mod util;
 
 /// Rust アプリケーションのエントリーポイント
@@ -38,7 +38,7 @@ fn main() {
 	let client_secret = result.unwrap();
 
 	// Google OAuth 2.0 のテスト
-	let result = service::execute_oauth_example(&client_secret.installed.client_id, &client_secret.installed.client_secret);
+	let result = google_oauth_example::execute(&client_secret.installed.client_id, &client_secret.installed.client_secret);
 	if result.is_err() {
 		let err = result.err().unwrap();
 		error!("{}", err);
