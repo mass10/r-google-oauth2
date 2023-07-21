@@ -260,7 +260,7 @@ fn exchange_code_to_tokens(
 	redirect_uri: &str,
 ) -> Result<TokenData, Box<dyn std::error::Error>> {
 	let url = "https://www.googleapis.com/oauth2/v4/token";
-	// let url = "https://oauth2.googleapis.com/token"; // こっちでもOK
+	// let url = "https://oauth2.googleapis.com/token"; // こっちでもOK(もしかしたらエイリアスなのかもしれない)
 
 	let mut params = std::collections::HashMap::new();
 	params.insert("code", code);
