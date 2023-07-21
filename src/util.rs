@@ -145,20 +145,6 @@ fn build_query_string(params: &std::collections::HashMap<&str, &str>) -> String 
 	return query;
 }
 
-#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct Installed {
-	pub client_id: String,
-	pub client_secret: String,
-	pub redirect_uris: Vec<String>,
-	pub auth_uri: String,
-	pub token_uri: String,
-}
-
-#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct ClientSecret {
-	pub installed: Installed,
-}
-
 // https://oauth2.googleapis.com/tokeninfo
 
 /// BASE64 文字列の特別な変換
@@ -174,22 +160,6 @@ pub fn generate_random_string(size: u32) -> String {
 	let buffer = generate_random_u8_array(size);
 	let s = encode_base64(&buffer);
 	return fix_base64_string(&s);
-}
-
-#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct TokenData {
-	/// アクセストークン
-	pub access_token: String,
-	/// アクセス トークンの残りの有効期間（秒）
-	expires_in: u32,
-	/// このプロパティは、リクエストに ID スコープ（openid、profile、email など）が含まれる場合にのみ返されます。
-	id_token: Option<String>,
-	/// 更新トークン
-	refresh_token: String,
-	/// access_token によって付与されるアクセス スコープ
-	scope: String,
-	/// 常に Bearer
-	token_type: String,
 }
 
 /// SHA256 ハッシュ
@@ -229,50 +199,6 @@ pub fn generate_random_u8_array(length: u32) -> Vec<u8> {
 	return result;
 }
 
-/// アクセストークン情報
-#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct TokenVerificationResult {
-	///
-	access_type: String,
-	///
-	aud: String,
-	///
-	azp: String,
-	/// メールアドレス
-	email: String,
-	/// ユーザーのメールアドレスが確認済みであれば true、そうでない場合は false。
-	email_verified: String,
-	///
-	exp: String,
-	/// アクセス トークンの残りの有効期間（秒）
-	expires_in: String,
-	/// access_token によって付与されるアクセス スコープ
-	scope: String,
-	/// ユーザー ID。すべての Google アカウントの中で一意であり、再利用されることはありません。
-	sub: String,
-}
-
-/// ユーザープロファイル
-#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
-pub struct UserProfile {
-	/// メールアドレス
-	email: String,
-	/// ユーザーのメールアドレスが確認済みであれば true、そうでない場合は false。
-	email_verified: bool,
-	/// ユーザーの姓（ラストネーム）
-	family_name: String,
-	/// ユーザーの名（ファースト ネーム）
-	given_name: String,
-	/// ユーザーの言語 / 地域
-	locale: String,
-	/// ユーザーの氏名（表示可能な形式）
-	name: String,
-	/// ユーザーのプロフィール写真の URL
-	picture: String,
-	/// ユーザー ID。すべての Google アカウントの中で一意であり、再利用されることはありません。
-	sub: String,
-}
-
 pub trait MapHelper {
 	fn get_string(&self, key: &str) -> String;
 }
@@ -306,4 +232,18 @@ impl SimpleStopWatch {
 		let elapsed = now.duration_since(self.start);
 		return elapsed;
 	}
+}
+
+pub fn http_post(url: &str, params: &std::collections::HashMap<&str, &str>) -> Result<String, Box<dyn std::error::Error>> {
+	let client = reqwest::blocking::Client::new();
+	let response = client.post(url).form(params).send()?;
+	let text = response.text()?;
+	return Ok(text);
+}
+
+pub fn http_get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+	let client = reqwest::blocking::Client::new();
+	let response = client.get(url).send()?;
+	let text = response.text()?;
+	return Ok(text);
 }
