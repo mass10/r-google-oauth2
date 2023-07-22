@@ -91,7 +91,9 @@ struct WellKnownEndpoints {
 fn get_gauth_wellknown_endpoints() -> Result<WellKnownEndpoints, Box<dyn std::error::Error>> {
 	let url = get_wellknown_schema_url();
 	let text = util::http_get(&url)?;
+
 	let result: WellKnownEndpoints = serde_json::from_str(&text)?;
+
 	return Ok(result);
 }
 
@@ -284,6 +286,7 @@ impl GoogleOAuth2 {
 		// TODO: この URL は wellknown に無いため、公開されていない手続きなのかもしれない。
 		let uri = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", access_token);
 		let text = util::http_get(&uri)?;
+
 		let token_info: TokenVerificationResult = serde_json::from_str(&text)?;
 
 		return Ok(token_info);
