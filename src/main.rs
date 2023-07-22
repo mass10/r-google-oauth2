@@ -5,29 +5,11 @@
 //! - [モバイル &デスクトップ アプリ向け OAuth 2.0](https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja)
 
 mod configuration;
-mod google_oauth_example;
+mod gauth2;
 mod util;
 
 /// Rust アプリケーションのエントリーポイント
 fn main() {
-	// コマンドラインオプション
-	let args: Vec<String> = std::env::args().skip(1).collect();
-	let mut options = getopts::Options::new();
-	options.opt("h", "help", "Usage", "FLAG", getopts::HasArg::No, getopts::Occur::Optional);
-	let result = options.parse(args);
-	if result.is_err() {
-		let err = result.err().unwrap();
-		println!("{}", err);
-		println!("{}", options.usage("r-google-oauth2-sample: Rust + Google OAuth 2.0 のサンプル"));
-		std::process::exit(1);
-	}
-	let matches = result.unwrap();
-
-	if matches.opt_present("help") {
-		println!("{}", options.usage("r-google-oauth2-sample: Rust + Google OAuth 2.0 のサンプル"));
-		std::process::exit(0);
-	}
-
 	// client_secret*.json を検出
 	let result = configuration::configure();
 	if result.is_err() {
@@ -38,7 +20,7 @@ fn main() {
 	let client_secret = result.unwrap();
 
 	// Google OAuth 2.0 のテスト
-	let result = google_oauth_example::execute(&client_secret.installed.client_id, &client_secret.installed.client_secret);
+	let result = execute_oauth_example(&client_secret.installed.client_id, &client_secret.installed.client_secret);
 	if result.is_err() {
 		let err = result.err().unwrap();
 		error!("{}", err);
@@ -46,4 +28,22 @@ fn main() {
 	}
 
 	info!("Ok.");
+}
+
+/// Google OAuth 2.0 のテスト
+fn execute_oauth_example(client_id: &str, client_secret: &str) -> Result<(), Box<dyn std::error::Error>> {
+	// ========== ブラウザーで認可画面を開く ==========
+	// Google OAuth による認可手続きの開始を要求します。
+	let service = crate::gauth2::GoogleOAuth2::new(client_id, client_secret);
+	let token = service.begin()?;
+
+	// ========== アクセストークンの確認 >> Google API ==========
+	let result = service.verify_access_token(&token.access_token)?;
+	info!("GOOGLE> verify: {}", serde_json::to_string_pretty(&result)?);
+
+	// ========== ユーザーの情報を要求 >> Google API ==========
+	let user_profile = service.query_user_info(&token.access_token)?;
+	info!("GOOGLE> user_profile: {}", serde_json::to_string_pretty(&user_profile)?);
+
+	return Ok(());
 }
