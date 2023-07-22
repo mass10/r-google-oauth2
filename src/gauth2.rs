@@ -190,6 +190,7 @@ fn exchange_code_to_tokens(
 pub struct GoogleOAuth2 {
 	client_id: String,
 	client_secret: String,
+	token_data: TokenData,
 }
 
 impl GoogleOAuth2 {
@@ -200,13 +201,23 @@ impl GoogleOAuth2 {
 		return Self {
 			client_id: client_id.to_string(),
 			client_secret: client_secret.to_string(),
+			token_data: TokenData {
+				access_token: "".to_string(),
+				expires_in: 0,
+				id_token: None,
+				refresh_token: "".to_string(),
+				scope: "".to_string(),
+				token_type: "".to_string(),
+			},
 		};
 	}
 
 	/// 認可手続きを行います。
 	///
 	/// 成功した場合は、アクセストークンを返します。
-	pub fn begin(&self) -> Result<TokenData, Box<dyn std::error::Error>> {
+	pub fn begin(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+		info!("認可手続きを開始しています...");
+
 		// ランダムなポートを選択します。
 		let port = util::select_random_tcp_port()?;
 		// リダイレクトURI(必須)
@@ -231,13 +242,14 @@ impl GoogleOAuth2 {
 		let token_info = exchange_code_to_tokens(&self.client_id, &self.client_secret, &state, &code, &code_verifier, &redirect_uri)?;
 		info!("GOOGLE> token_info: {}", serde_json::to_string_pretty(&token_info)?);
 
-		return Ok(token_info);
+		self.token_data = token_info;
+
+		return Ok(());
 	}
 
 	/// トークンの有効性を確認します。
-	pub fn verify_access_token(&self, access_token: &str) -> Result<TokenVerificationResult, Box<dyn std::error::Error>> {
-		info!("Verify access token...");
-
+	pub fn verify_access_token(&self) -> Result<TokenVerificationResult, Box<dyn std::error::Error>> {
+		let access_token = &self.token_data.access_token;
 		let uri = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", access_token);
 		let text = util::http_get(&uri)?;
 		let token_info: TokenVerificationResult = serde_json::from_str(&text)?;
@@ -246,7 +258,8 @@ impl GoogleOAuth2 {
 	}
 
 	/// ユーザープロファイルを問い合わせます。
-	pub fn query_user_info(&self, access_token: &str) -> Result<UserProfile, Box<dyn std::error::Error>> {
+	pub fn query_user_info(&self) -> Result<UserProfile, Box<dyn std::error::Error>> {
+		let access_token = &self.token_data.access_token;
 		let url = "https://www.googleapis.com/oauth2/v3/userinfo";
 
 		let mut headers = reqwest::header::HeaderMap::new();
