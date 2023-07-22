@@ -32,18 +32,20 @@ fn main() {
 
 /// Google OAuth 2.0 のテスト
 fn execute_oauth_example(client_id: &str, client_secret: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let service = crate::gauth2::GoogleOAuth2::new(client_id, client_secret);
-	
+	let mut service = crate::gauth2::GoogleOAuth2::new(client_id, client_secret);
+
 	// ========== ブラウザーで認可画面を開く ==========
 	// Google OAuth による認可手続きの開始を要求します。
-	let token = service.begin()?;
+	service.begin()?;
 
 	// ========== アクセストークンの確認 >> Google API ==========
-	let result = service.verify_access_token(&token.access_token)?;
+	info!("セッションの妥当性を確認しています...");
+	let result = service.verify_access_token()?;
 	info!("GOOGLE> verify: {}", serde_json::to_string_pretty(&result)?);
 
 	// ========== ユーザーの情報を要求 >> Google API ==========
-	let user_profile = service.query_user_info(&token.access_token)?;
+	info!("ユーザープロフィールを問い合わせています...");
+	let user_profile = service.query_user_info()?;
 	info!("GOOGLE> user_profile: {}", serde_json::to_string_pretty(&user_profile)?);
 
 	return Ok(());
