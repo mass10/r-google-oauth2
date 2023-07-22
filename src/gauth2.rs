@@ -62,22 +62,35 @@ pub struct UserProfile {
 	sub: String,
 }
 
-/// Google OAuth による認可手続き要求します。
-pub fn begin_auth(client_id: &str, redirect_uri: &str, state: &str, code_challenge: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let scopes = "openid profile email";
+/// Google OAuth 2.0 の設定 URL を取得します。
+fn get_wellknown_schema_url() -> String {
+	return "https://accounts.google.com/.well-known/openid-configuration".to_string();
+}
 
-	let url = format!(
-            "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&scope={scopes}&redirect_uri={redirect_uri}&client_id={client_id}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
-            scopes = util::urlencode(&scopes),
-            redirect_uri = util::urlencode(&redirect_uri),
-            client_id = client_id,
-            state = util::urlencode(&state),
-            code_challenge = code_challenge
-		);
+/// Google OAuth 2.0 の設定
+#[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
+struct WellKnownEndpoints {
+	issuer: String,
+	authorization_endpoint: String,
+	token_endpoint: String,
+	userinfo_endpoint: String,
+	revocation_endpoint: String,
+	jwks_uri: String,
+	response_types_supported: Vec<String>,
+	subject_types_supported: Vec<String>,
+	id_token_signing_alg_values_supported: Vec<String>,
+	scopes_supported: Vec<String>,
+	token_endpoint_auth_methods_supported: Vec<String>,
+	claims_supported: Vec<String>,
+	code_challenge_methods_supported: Vec<String>,
+}
 
-	util::open_browser(&url)?;
-
-	return Ok(());
+/// Google OAuth 2.0 の設定を取得します。
+fn get_gauth_wellknown_endpoints() -> Result<WellKnownEndpoints, Box<dyn std::error::Error>> {
+	let url = get_wellknown_schema_url();
+	let text = util::http_get(&url)?;
+	let result: WellKnownEndpoints = serde_json::from_str(&text)?;
+	return Ok(result);
 }
 
 /// 接続を開始します。
@@ -188,6 +201,7 @@ fn exchange_code_to_tokens(
 }
 
 pub struct GoogleOAuth2 {
+	wellknown_endpoints: WellKnownEndpoints,
 	client_id: String,
 	client_secret: String,
 	token_data: TokenData,
@@ -197,8 +211,12 @@ impl GoogleOAuth2 {
 	/// コンストラクター
 	///
 	/// 新しいインスタンスを返します。
-	pub fn new(client_id: &str, client_secret: &str) -> Self {
-		return Self {
+	pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Box<dyn std::error::Error>> {
+		// Google OAuth 2.0 の設定を取得します。
+		let wellknown_endpoints = get_gauth_wellknown_endpoints()?;
+
+		let instance = Self {
+			wellknown_endpoints: wellknown_endpoints,
 			client_id: client_id.to_string(),
 			client_secret: client_secret.to_string(),
 			token_data: TokenData {
@@ -210,6 +228,8 @@ impl GoogleOAuth2 {
 				token_type: "".to_string(),
 			},
 		};
+
+		return Ok(instance);
 	}
 
 	/// 認可手続きを行います。
@@ -231,7 +251,7 @@ impl GoogleOAuth2 {
 
 		// ========== ブラウザーで認可画面を開く ==========
 		// Google OAuth による認可手続きの開始を要求します。
-		begin_auth(&self.client_id, &redirect_uri, &state, &code_challenge)?;
+		self.begin_auth(&redirect_uri, &state, &code_challenge)?;
 
 		// ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
 		// 応答を受け取るための HTTP サーバーを立ち上げます。
@@ -247,10 +267,32 @@ impl GoogleOAuth2 {
 		return Ok(());
 	}
 
+	/// Google OAuth による認可手続き要求します。
+	fn begin_auth(&self, redirect_uri: &str, state: &str, code_challenge: &str) -> Result<(), Box<dyn std::error::Error>> {
+		let authorization_endpoint = &self.wellknown_endpoints.authorization_endpoint;
+		let client_id = &self.client_id;
+		let scopes = "openid profile email";
+
+		let url = format!(
+            "{authorization_endpoint}?response_type=code&scope={scopes}&redirect_uri={redirect_uri}&client_id={client_id}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
+			authorization_endpoint = authorization_endpoint,
+            scopes = util::urlencode(&scopes),
+            redirect_uri = util::urlencode(&redirect_uri),
+            client_id = client_id,
+            state = util::urlencode(&state),
+            code_challenge = code_challenge
+		);
+
+		util::open_browser(&url)?;
+
+		return Ok(());
+	}
+
 	/// トークンの有効性を確認します。
 	pub fn verify_access_token(&self) -> Result<TokenVerificationResult, Box<dyn std::error::Error>> {
 		let access_token = &self.token_data.access_token;
 		let uri = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", access_token);
+		// let uri = format!("https://oauth2.googleapis.com/token?access_token={}", access_token);
 		let text = util::http_get(&uri)?;
 		let token_info: TokenVerificationResult = serde_json::from_str(&text)?;
 
