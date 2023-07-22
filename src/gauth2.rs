@@ -203,6 +203,9 @@ impl GoogleOAuth2 {
 		};
 	}
 
+	/// 認可手続きを行います。
+	///
+	/// 成功した場合は、アクセストークンを返します。
 	pub fn begin(&self) -> Result<TokenData, Box<dyn std::error::Error>> {
 		// ランダムなポートを選択します。
 		let port = util::select_random_tcp_port()?;
