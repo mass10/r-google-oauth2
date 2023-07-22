@@ -32,9 +32,10 @@ fn main() {
 
 /// Google OAuth 2.0 のテスト
 fn execute_oauth_example(client_id: &str, client_secret: &str) -> Result<(), Box<dyn std::error::Error>> {
+	let service = crate::gauth2::GoogleOAuth2::new(client_id, client_secret);
+	
 	// ========== ブラウザーで認可画面を開く ==========
 	// Google OAuth による認可手続きの開始を要求します。
-	let service = crate::gauth2::GoogleOAuth2::new(client_id, client_secret);
 	let token = service.begin()?;
 
 	// ========== アクセストークンの確認 >> Google API ==========
