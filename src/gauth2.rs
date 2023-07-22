@@ -193,6 +193,9 @@ pub struct GoogleOAuth2 {
 }
 
 impl GoogleOAuth2 {
+	/// コンストラクター
+	///
+	/// 新しいインスタンスを返します。
 	pub fn new(client_id: &str, client_secret: &str) -> Self {
 		return Self {
 			client_id: client_id.to_string(),
