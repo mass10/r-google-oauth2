@@ -108,7 +108,7 @@ fn accept_peer(mut stream: std::net::TcpStream) -> Result<std::collections::Hash
 	info!("REQUEST> {}", serde_json::to_string_pretty(&q)?);
 
 	let response = format!("HTTP/1.1 200 OK\r\n\r\nOk.");
-	stream.write(response.as_bytes()).unwrap();
+	stream.write(response.as_bytes())?;
 
 	return Ok(q);
 }
@@ -298,13 +298,14 @@ impl GoogleOAuth2 {
 		let url = self.wellknown_endpoints.userinfo_endpoint.as_str();
 
 		let mut headers = reqwest::header::HeaderMap::new();
-		headers.insert("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", access_token)).unwrap());
+		let value = reqwest::header::HeaderValue::from_str(&format!("Bearer {}", access_token))?;
+		headers.insert("Authorization", value);
 
 		let client = reqwest::blocking::Client::new();
-		let response = client.get(url).headers(headers).send().unwrap();
-		let text = response.text().unwrap();
+		let response = client.get(url).headers(headers).send()?;
+		let text = response.text()?;
 
-		let user_profile: UserProfile = serde_json::from_str(&text).unwrap();
+		let user_profile: UserProfile = serde_json::from_str(&text)?;
 
 		return Ok(user_profile);
 	}
