@@ -104,6 +104,7 @@ fn accept_peer(mut stream: std::net::TcpStream) -> Result<std::collections::Hash
 	let buf_reader = std::io::BufReader::new(&mut stream);
 	let http_request: Vec<_> = buf_reader.lines().map(|result| result.unwrap()).take_while(|line| !line.is_empty()).collect();
 
+	// リクエスト本文の解析
 	let q = util::diagnose_http_request(&http_request);
 	info!("REQUEST> {}", serde_json::to_string_pretty(&q)?);
 
