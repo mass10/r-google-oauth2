@@ -49,7 +49,8 @@ fn split_querystring(url: &str) -> std::collections::HashMap<String, String> {
 	return query;
 }
 
-fn retrieve_url(unknown: &str) -> String {
+/// "GET /?state=... HTTP/1.1" から URL を抽出します。
+fn get_request_path(unknown: &str) -> String {
 	if !unknown.starts_with("GET /") {
 		return String::new();
 	}
@@ -58,9 +59,10 @@ fn retrieve_url(unknown: &str) -> String {
 	return url.to_string();
 }
 
+/// HTTP リクエストを解析します。
 pub fn diagnose_http_request(http_request: &Vec<String>) -> std::collections::HashMap<String, String> {
 	for line in http_request {
-		let url = retrieve_url(line);
+		let url = get_request_path(line);
 		if url == "" {
 			continue;
 		}
