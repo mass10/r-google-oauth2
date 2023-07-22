@@ -72,7 +72,9 @@ fn get_wellknown_schema_url() -> String {
 struct WellKnownEndpoints {
 	issuer: String,
 	authorization_endpoint: String,
+	/// https://oauth2.googleapis.com/token
 	token_endpoint: String,
+	/// https://www.googleapis.com/oauth2/v3/userinfo
 	userinfo_endpoint: String,
 	revocation_endpoint: String,
 	jwks_uri: String,
@@ -126,7 +128,7 @@ fn recv_response(port: u16) -> Result<(String, String), Box<dyn std::error::Erro
 	let address = format!("127.0.0.1:{}", port);
 	let listener = std::net::TcpListener::bind(&address)?;
 
-	// non-blocking にすることで、accept がブロックしないようにする
+	// 適当にキャンセルできるためには、accept が non-blocking である必要があります。
 	listener.set_nonblocking(true)?;
 
 	// 簡易的なストップウォッチ
@@ -171,35 +173,6 @@ fn recv_response(port: u16) -> Result<(String, String), Box<dyn std::error::Erro
 	return Ok((code, state));
 }
 
-/// code などを使って、アクセストークンを取得します。
-fn exchange_code_to_tokens(
-	client_id: &str,
-	client_secret: &str,
-	state: &str,
-	code: &str,
-	code_verifier: &str,
-	redirect_uri: &str,
-) -> Result<TokenData, Box<dyn std::error::Error>> {
-	let url = "https://www.googleapis.com/oauth2/v4/token";
-	// let url = "https://oauth2.googleapis.com/token"; // こっちでもOK(もしかしたらエイリアスなのかもしれない)
-
-	let mut params = std::collections::HashMap::new();
-	params.insert("code", code);
-	params.insert("client_id", client_id);
-	params.insert("state", &state);
-	params.insert("scope", "");
-	params.insert("client_secret", client_secret);
-	params.insert("redirect_uri", redirect_uri);
-	params.insert("grant_type", "authorization_code");
-	params.insert("code_verifier", &code_verifier);
-
-	let text = util::http_post(url, &params)?;
-
-	let token_info: TokenData = serde_json::from_str(&text)?;
-
-	return Ok(token_info);
-}
-
 pub struct GoogleOAuth2 {
 	wellknown_endpoints: WellKnownEndpoints,
 	client_id: String,
@@ -214,6 +187,7 @@ impl GoogleOAuth2 {
 	pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Box<dyn std::error::Error>> {
 		// Google OAuth 2.0 の設定を取得します。
 		let wellknown_endpoints = get_gauth_wellknown_endpoints()?;
+		info!("GOOGLE> wellknown_endpoints: {}", serde_json::to_string_pretty(&wellknown_endpoints)?);
 
 		let instance = Self {
 			wellknown_endpoints: wellknown_endpoints,
@@ -251,7 +225,7 @@ impl GoogleOAuth2 {
 
 		// ========== ブラウザーで認可画面を開く ==========
 		// Google OAuth による認可手続きの開始を要求します。
-		self.begin_auth(&redirect_uri, &state, &code_challenge)?;
+		self.open_browser_to_begin(&redirect_uri, &state, &code_challenge)?;
 
 		// ========== HTTP サーバーを立ち上げてリダイレクトを待つ ==========
 		// 応答を受け取るための HTTP サーバーを立ち上げます。
@@ -259,7 +233,7 @@ impl GoogleOAuth2 {
 
 		// ========== トークンに変換 >> Google API ==========
 		// アクセストークンをリクエスト
-		let token_info = exchange_code_to_tokens(&self.client_id, &self.client_secret, &state, &code, &code_verifier, &redirect_uri)?;
+		let token_info = self.exchange_code_to_tokens(&state, &code, &code_verifier, &redirect_uri)?;
 		info!("GOOGLE> token_info: {}", serde_json::to_string_pretty(&token_info)?);
 
 		self.token_data = token_info;
@@ -267,18 +241,33 @@ impl GoogleOAuth2 {
 		return Ok(());
 	}
 
-	/// Google OAuth による認可手続き要求します。
-	fn begin_auth(&self, redirect_uri: &str, state: &str, code_challenge: &str) -> Result<(), Box<dyn std::error::Error>> {
-		let authorization_endpoint = &self.wellknown_endpoints.authorization_endpoint;
-		let client_id = &self.client_id;
-		let scopes = "openid profile email";
+	/// code などを使って、アクセストークンを取得します。
+	fn exchange_code_to_tokens(&self, state: &str, code: &str, code_verifier: &str, redirect_uri: &str) -> Result<TokenData, Box<dyn std::error::Error>> {
+		let mut params = std::collections::HashMap::new();
+		params.insert("code", code);
+		params.insert("client_id", &self.client_id);
+		params.insert("state", &state);
+		params.insert("scope", "");
+		params.insert("client_secret", &self.client_secret);
+		params.insert("redirect_uri", redirect_uri);
+		params.insert("grant_type", "authorization_code");
+		params.insert("code_verifier", &code_verifier);
 
+		let text = util::http_post(&self.wellknown_endpoints.token_endpoint, &params)?;
+
+		let token_info: TokenData = serde_json::from_str(&text)?;
+
+		return Ok(token_info);
+	}
+
+	/// Google OAuth による認可手続き要求します。
+	fn open_browser_to_begin(&self, redirect_uri: &str, state: &str, code_challenge: &str) -> Result<(), Box<dyn std::error::Error>> {
 		let url = format!(
             "{authorization_endpoint}?response_type=code&scope={scopes}&redirect_uri={redirect_uri}&client_id={client_id}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
-			authorization_endpoint = authorization_endpoint,
-            scopes = util::urlencode(&scopes),
+			authorization_endpoint = &self.wellknown_endpoints.authorization_endpoint,
+            scopes = util::urlencode("openid profile email"),
             redirect_uri = util::urlencode(&redirect_uri),
-            client_id = client_id,
+            client_id = &self.client_id,
             state = util::urlencode(&state),
             code_challenge = code_challenge
 		);
@@ -291,8 +280,9 @@ impl GoogleOAuth2 {
 	/// トークンの有効性を確認します。
 	pub fn verify_access_token(&self) -> Result<TokenVerificationResult, Box<dyn std::error::Error>> {
 		let access_token = &self.token_data.access_token;
+
+		// TODO: この URL は wellknown に無いため、公開されていない手続きなのかもしれない。
 		let uri = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", access_token);
-		// let uri = format!("https://oauth2.googleapis.com/token?access_token={}", access_token);
 		let text = util::http_get(&uri)?;
 		let token_info: TokenVerificationResult = serde_json::from_str(&text)?;
 
@@ -302,7 +292,7 @@ impl GoogleOAuth2 {
 	/// ユーザープロファイルを問い合わせます。
 	pub fn query_user_info(&self) -> Result<UserProfile, Box<dyn std::error::Error>> {
 		let access_token = &self.token_data.access_token;
-		let url = "https://www.googleapis.com/oauth2/v3/userinfo";
+		let url = self.wellknown_endpoints.userinfo_endpoint.as_str();
 
 		let mut headers = reqwest::header::HeaderMap::new();
 		headers.insert("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", access_token)).unwrap());
