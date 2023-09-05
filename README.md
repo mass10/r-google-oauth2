@@ -1,2 +1,2 @@
 # r-google-oauth2
-Rust, Google OAuth 2.0
+Rust CLI Application + Google OAuth 2.0
