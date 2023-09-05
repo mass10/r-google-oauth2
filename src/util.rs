@@ -17,7 +17,7 @@ macro_rules! info {
 		let line = format!($($arg)*);
 		let current_timestamp = crate::util::get_current_timestamp();
 		let pid = std::process::id();
-		let _ = std::format_args!("{}", line);
+		// let _ = std::format_args!("{}", line);
         println!("{} ({}) [info] {}", current_timestamp, pid, line);
     };
 }
@@ -28,7 +28,7 @@ macro_rules! error {
 		let line = format!($($arg)*);
 		let current_timestamp = crate::util::get_current_timestamp();
 		let pid = std::process::id();
-		let _ = std::format_args!("{}", line);
+		// let _ = std::format_args!("{}", line);
         println!("{} ({}) [error] {}", current_timestamp, pid, line);
     };
 }

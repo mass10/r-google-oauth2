@@ -43,12 +43,10 @@ fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::e
 
 /// コンフィギュレーションを行います。
 pub fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
-	let location = ".\\";
-
-	let files = enumerate_client_secret(location)?;
+	// カレントディレクトリ配下の client_secret*.json を検索
+	let files = enumerate_client_secret(".")?;
 	if files.len() == 0 {
-		info!("ファイルなし");
-		return Err("No client secret found".into());
+		return Err("client secret がみつかりません。".into());
 	}
 
 	for file in files {
@@ -57,13 +55,11 @@ pub fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
 			info!("パースエラー {:?}", file);
 			continue;
 		}
-		let client_secret = result.unwrap();
-		if client_secret.installed.client_id.len() > 0 && client_secret.installed.client_secret.len() > 0 {
-			return Ok(client_secret);
-		}
+		// パースに成功した最初のファイルを採用
+		return Ok(result.unwrap());
 	}
 
-	return Err("No client secret found".into());
+	return Err("client secret がみつかりません。".into());
 }
 
 /// client_secret*.json をパースします。
@@ -74,5 +70,11 @@ fn parse_client_secret(path: &str) -> Result<ClientSecret, Box<dyn std::error::E
 	let file = std::fs::File::open(path)?;
 	let reader = std::io::BufReader::new(file);
 	let client_secret: ClientSecret = serde_json::from_reader(reader)?;
+	if client_secret.installed.client_id.is_empty() {
+		return Err("無効な client id です。".into());
+	}
+	if client_secret.installed.client_secret.is_empty() {
+		return Err("無効な client secret です。".into());
+	}
 	return Ok(client_secret);
 }
