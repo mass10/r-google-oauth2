@@ -53,7 +53,7 @@ pub struct UserProfile {
 	/// ユーザーの名（ファースト ネーム）
 	given_name: String,
 	/// ユーザーの言語 / 地域
-	locale: String,
+	locale: Option<String>,
 	/// ユーザーの氏名（表示可能な形式）
 	name: String,
 	/// ユーザーのプロフィール写真の URL
