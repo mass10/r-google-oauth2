@@ -20,7 +20,10 @@ fn main() {
 	let client_secret = result.unwrap();
 
 	// Google OAuth 2.0 のテスト
-	let result = execute_oauth_example(&client_secret.installed.client_id, &client_secret.installed.client_secret);
+	let result = execute_oauth_example(
+		&client_secret.installed.client_id,
+		&client_secret.installed.client_secret,
+	);
 	if result.is_err() {
 		let err = result.err().unwrap();
 		error!("{}", err);
@@ -46,7 +49,10 @@ fn execute_oauth_example(client_id: &str, client_secret: &str) -> Result<(), Box
 	// ========== ユーザーの情報を要求 >> Google API ==========
 	info!("ユーザープロフィールを問い合わせています...");
 	let user_profile = service.query_user_info()?;
-	info!("GOOGLE> user_profile: {}", serde_json::to_string_pretty(&user_profile)?);
+	info!(
+		"GOOGLE> user_profile: {}",
+		serde_json::to_string_pretty(&user_profile)?
+	);
 
 	return Ok(());
 }
