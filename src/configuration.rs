@@ -1,5 +1,12 @@
+//!
+//!
+//!
+
 use crate::info;
 
+///
+///
+///
 #[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
 pub struct Installed {
 	pub client_id: String,
@@ -9,15 +16,20 @@ pub struct Installed {
 	pub token_uri: String,
 }
 
+///
+///
+///
 #[derive(serde_derive::Serialize, serde_derive::Deserialize, Debug)]
 pub struct ClientSecret {
 	pub installed: Installed,
 }
 
+///
 /// client_secret*.json を列挙します。
 ///
 /// # Arguments
 /// * `location` - 検索を開始する場所
+///
 fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 	let mut result: Vec<String> = vec![];
 	let unknown = std::path::Path::new(location);
@@ -41,7 +53,9 @@ fn enumerate_client_secret(location: &str) -> Result<Vec<String>, Box<dyn std::e
 	return Ok(result);
 }
 
+///
 /// コンフィギュレーションを行います。
+///
 pub fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
 	// カレントディレクトリ配下の client_secret*.json を検索
 	let files = enumerate_client_secret(".")?;
@@ -62,10 +76,12 @@ pub fn configure() -> Result<ClientSecret, Box<dyn std::error::Error>> {
 	return Err("client secret がみつかりません。".into());
 }
 
+///
 /// client_secret*.json をパースします。
 ///
 /// # Arguments
 /// * `path` - ファイルパス
+///
 fn parse_client_secret(path: &str) -> Result<ClientSecret, Box<dyn std::error::Error>> {
 	let file = std::fs::File::open(path)?;
 	let reader = std::io::BufReader::new(file);
