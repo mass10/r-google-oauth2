@@ -236,7 +236,7 @@ pub fn generate_random_u8_array(length: u32) -> Vec<u8> {
 }
 
 ///
-/// 
+///
 ///
 pub trait MapHelper {
 	fn get_string(&self, key: &str) -> String;
@@ -278,7 +278,10 @@ impl SimpleStopWatch {
 ///
 /// POST リクエストを送信します。(フォーム送信型)
 ///
-pub fn http_post(url: &str, params: &std::collections::HashMap<&str, &str>) -> Result<String, Box<dyn std::error::Error>> {
+pub fn http_post(
+	url: &str,
+	params: &std::collections::HashMap<&str, &str>,
+) -> Result<String, Box<dyn std::error::Error>> {
 	let client = reqwest::blocking::Client::new();
 	let response = client.post(url).form(params).send()?;
 	let text = response.text()?;
